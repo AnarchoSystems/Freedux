@@ -11,7 +11,7 @@ public class Store<State, Symbols, Program> : ObservableObject {
     
     @MainActor
     public var value : State
-    private var interpreter : any InterpreterProtocol<State, Symbols, Program>
+    private var interpreter : AnyInterpreter
     private var hasShutdown = false
     
     @MainActor
@@ -27,7 +27,7 @@ public class Store<State, Symbols, Program> : ObservableObject {
                                                     build: (Env) -> (State, I)) -> Store<State, Symbols, Program> where
     I.State == State, I.Symbols == Symbols, I.Program == Program {
         let result = MutableStore(env, build)
-        result.interpreter.store = result
+        result.interpreter.setStore(result)
         result.interpreter.onBoot()
         return result
     }
@@ -43,7 +43,7 @@ public class Store<State, Symbols, Program> : ObservableObject {
         if hasShutdown {
             print("receiving actions after shutdown!")
         }
-        return interpreter.parse(symbols)
+        return interpreter._parse(symbols) as! Program
     }
     
     @MainActor
