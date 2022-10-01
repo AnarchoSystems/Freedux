@@ -7,35 +7,60 @@
 
 import Foundation
 
-@available(macOS 10.15, *)
-public class Store<Interpreter : InterpreterProtocol> : ObservableObject {
+public class Store<State, Symbols, Program> : ObservableObject {
     
-    @Published public var value : Interpreter.State
-    private var interpreter : Interpreter
-    private var hasShutDown = false
+    @MainActor
+    public var value : State
+    private var interpreter : any InterpreterProtocol<State, Symbols, Program>
+    private var hasShutdown = false
     
-    public init<Env>(_ env: Env,
-                     build: (Env) -> (Interpreter.State, Interpreter)) {
-        (value, interpreter) = build(env)
-        interpreter.store = self
-        interpreter.onBoot()
+    @MainActor
+    fileprivate init<Env, I : InterpreterProtocol>(_ env: Env, _ build: (Env) -> (State, I)) where
+    I.State == State, I.Symbols == Symbols, I.Program == Program {
+        let (value, interpreter) = build(env)
+        self.value = value
+        self.interpreter = interpreter
     }
     
-    public convenience init(value: Interpreter.State, interpreter: Interpreter) {
-        self.init((), build: {(value, interpreter)})
+    @MainActor
+    public static func create<Env, I : InterpreterProtocol>(_ env: Env,
+                                                    build: (Env) -> (State, I)) -> Store<State, Symbols, Program> where
+    I.State == State, I.Symbols == Symbols, I.Program == Program {
+        let result = MutableStore(env, build)
+        result.interpreter.store = result
+        result.interpreter.onBoot()
+        return result
     }
     
-    public func send(_ symbols: Interpreter.Symbols) -> Interpreter.Program {
-        if hasShutDown {
-            print("Warning: receiving actions after shutdown!")
+    @MainActor
+    public static func create<I : InterpreterProtocol>(_ state: State, interpreter: I) -> Store<State, Symbols, Program> where
+    I.State == State, I.Symbols == Symbols, I.Program == Program {
+        create(()) {(state, interpreter)}
+    }
+    
+    @MainActor
+    public func send(_ symbols: Symbols) -> Program {
+        if hasShutdown {
+            print("receiving actions after shutdown!")
         }
         return interpreter.parse(symbols)
     }
     
+    @MainActor
     public func shutDown() {
-        guard !hasShutDown else {return}
         interpreter.onShutDown()
-        hasShutDown = true
+        hasShutdown = true
+    }
+    
+}
+
+public final class MutableStore<State, Symbols, Program> : Store<State, Symbols, Program> {
+    
+    @MainActor
+    @inlinable
+    public override var value : State {
+        _read{yield super.value}
+        _modify{yield &super.value}
     }
     
 }

@@ -3,17 +3,10 @@ import Freedux
 
 final class FreeduxTests: XCTestCase {
     
-    func testRef() {
-        
-        let example = Store(value: 0, interpreter: NopInterpreter())
-        example.value = 42
-        XCTAssert(example.value == 42)
-        
-    }
-    
+    @MainActor
     func testInterpret() {
         
-        let ref = Store(value: 0, interpreter: TestInterpreter())
+        let ref = Store.create(0, interpreter: TestInterpreter())
         let monad = ref.send(doSomething())
         monad.runUnsafe()
         ref.shutDown()
@@ -22,19 +15,13 @@ final class FreeduxTests: XCTestCase {
     
 }
 
-struct NopInterpreter : InterpreterProtocol {
-    typealias State = Int
-    weak var store: Store<NopInterpreter>!
-    func onBoot() {}
-    func parse(_ symbols: Void) {}
-    func onShutDown() {}
-}
-
 enum TestCommand<T> {
     case onBoot
     case pure(T)
-    case fetchInt(String, (Int) -> TestCommand<T>)
-    case mutate((inout Int) -> T, (T) -> TestCommand<T>)
+    case fetchInt(String,
+                  @MainActor (Int) -> TestCommand<T>)
+    case mutate(@MainActor (inout Int) -> T,
+                @MainActor(T) -> TestCommand<T>)
     case assert42
     case onShutdown
 }
@@ -59,23 +46,22 @@ func doSomething() -> TestCommand<Void> {
 
 struct LazyIdentity<T> {
     
-    let runUnsafe : () -> T
+    let runUnsafe :
+    @MainActor () -> T
     
     static func pure(_ t: T) -> Self {
         .init{t}
     }
     
-    func then<U>(_ trafo: @escaping (T) -> LazyIdentity<U>) -> LazyIdentity<U> {
+    func then<U>(_ trafo: @escaping
+                 @MainActor (T) -> LazyIdentity<U>) -> LazyIdentity<U> {
         .init{trafo(runUnsafe()).runUnsafe()}
     }
     
 }
 
-final class TestInterpreter : InterpreterProtocol {
+final class TestInterpreter : Interpreter<Int, TestCommand<Void>, LazyIdentity<Void>> {
     
-    typealias State = Int
-    
-    weak var store: Store<TestInterpreter>!
     private var didBoot = false
     
     func onBoot() {
