@@ -10,7 +10,11 @@ import Foundation
 public class Store<State, Symbols, Program> : ObservableObject {
     
     @MainActor
-    public var value : State
+    fileprivate(set) public var value : State {
+        willSet {
+            objectWillChange.send()
+        }
+    }
     private var interpreter : AnyInterpreter
     private var hasShutdown = false
     
