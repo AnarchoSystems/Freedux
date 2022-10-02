@@ -69,10 +69,10 @@ public extension Module {
 
 import Foundation
 
-public final class ModuleStore<M : Module, Program> : ObservableObject {
+public final class ModuleStore<M : Module> : ObservableObject {
     
     @MainActor
-    let base : Store<M.Whole, M.Symbols, Program>
+    let base : Store<M.Whole, M.Symbols>
     @MainActor
     let module : M
     
@@ -82,13 +82,13 @@ public final class ModuleStore<M : Module, Program> : ObservableObject {
     }
     
     @MainActor
-    init(base: Store<M.Whole, M.Symbols, Program>, module: M) {
+    init(base: Store<M.Whole, M.Symbols>, module: M) {
         self.base = base
         self.module = module
     }
     
     @MainActor
-    public func send(_ symbols: M.NewSymbols) -> Program {
+    public func send(_ symbols: M.NewSymbols) {
         base.send(module.translate(symbols))
     }
     
@@ -101,7 +101,7 @@ public final class ModuleStore<M : Module, Program> : ObservableObject {
 public extension Store {
     
     @MainActor
-    func map<M : Module>(_ module: M) -> ModuleStore<M, Program> where M.Symbols == Symbols, M.Whole == State {
+    func map<M : Module>(_ module: M) -> ModuleStore<M> where M.Symbols == Symbols, M.Whole == State {
         .init(base: self, module: module)
     }
     
@@ -110,7 +110,7 @@ public extension Store {
 public extension ModuleStore {
     
     @MainActor
-    func map<M2 : Module>(_ module: M2) -> ModuleStore<AppendingModule<M, M2>, Program> {
+    func map<M2 : Module>(_ module: M2) -> ModuleStore<AppendingModule<M, M2>> {
         .init(base: base, module: self.module.appending(module))
     }
     

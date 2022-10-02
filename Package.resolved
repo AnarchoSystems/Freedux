@@ -1,0 +1,23 @@
+{
+  "pins" : [
+    {
+      "identity" : "swift-case-paths",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/pointfreeco/swift-case-paths",
+      "state" : {
+        "revision" : "7346701ea29da0a85d4403cf3d7a589a58ae3dee",
+        "version" : "0.9.2"
+      }
+    },
+    {
+      "identity" : "swiftdi",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/AnarchoSystems/SwiftDI.git",
+      "state" : {
+        "branch" : "main",
+        "revision" : "0557b39a2c41d81c64d57984e5307830c7e6317c"
+      }
+    }
+  ],
+  "version" : 2
+}

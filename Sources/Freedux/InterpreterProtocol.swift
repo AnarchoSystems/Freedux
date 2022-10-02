@@ -17,48 +17,51 @@ public protocol AnyInterpreter {
     func _parse(_ any: Any) -> Any
     
     @MainActor
-    func setStore(_ store: Any)
+    func _runUnsafe(_ any: Any)
     
 }
 
-public protocol InterpreterProtocol<State, Symbols, Program> : AnyInterpreter {
+public extension AnyInterpreter {
     
-    associatedtype State
+    @MainActor
+    func _run(_ any: Any) {
+        _runUnsafe(_parse(any))
+    }
+    
+}
+
+public protocol Interpreter<Symbols, Program> : AnyInterpreter {
+    
     associatedtype Symbols
     associatedtype Program
-    
-    var store : MutableStore<State, Symbols, Program>! {get set}
     
     @MainActor
     func parse(_ symbols: Symbols) -> Program
     
+    @MainActor
+    func runUnsafe(_ program: Program)
+    
 }
 
-public extension InterpreterProtocol {
+public extension Interpreter {
     
     @MainActor
     func _parse(_ any: Any) -> Any {
         parse(any as! Symbols)
     }
     
-}
-
-open class _Interpreter<State, Symbols, Program> {
-    
     @MainActor
-    public var store: MutableStore<State, Symbols, Program>!
-    
-    @MainActor
-    public init() {}
-    
-    @MainActor
-    public func setStore(_ store: Any) {
-        guard let store = store as? MutableStore<State, Symbols, Program> else {
-            return
-        }
-        self.store = store
+    func _runUnsafe(_ any: Any) {
+        runUnsafe(any as! Program)
     }
+    
+    @MainActor
+    func runUnsafe(_ program: ()) where Program == Void {}
+    
+    @MainActor
+    func onBoot() {}
+    
+    @MainActor
+    func onShutDown() {}
 
 }
-
-public typealias Interpreter<State, Symbols, Program> = _Interpreter<State, Symbols, Program> & InterpreterProtocol

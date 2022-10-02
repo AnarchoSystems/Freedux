@@ -1,5 +1,7 @@
 import XCTest
 import Freedux
+import SwiftDI
+import CasePaths
 
 final class FreeduxTests: XCTestCase {
     
@@ -7,8 +9,7 @@ final class FreeduxTests: XCTestCase {
     func testInterpret() {
         
         let ref = Store.create(0, interpreter: TestInterpreter())
-        let monad = ref.send(doSomething())
-        monad.runUnsafe()
+        ref.send(doSomething())
         ref.shutDown()
         
     }
@@ -60,13 +61,17 @@ struct LazyIdentity<T> {
     
 }
 
-final class TestInterpreter : Interpreter<Int, TestCommand<Void>, LazyIdentity<Void>> {
+final class TestInterpreter : Interpreter {
     
     private var didBoot = false
     
     func onBoot() {
-        store.send(.onBoot).runUnsafe()
+        store.send(.onBoot)
     }
+    
+    @Injected var store : MutableStore<Int, TestCommand<Void>, LazyIdentity<Void>>
+    
+    @Injected(\.fetchInterpreter) var fetch
     
     func parse(_ symbols: TestCommand<Void>) -> LazyIdentity<Void> {
         switch symbols {
@@ -75,21 +80,11 @@ final class TestInterpreter : Interpreter<Int, TestCommand<Void>, LazyIdentity<V
         case .pure(let t):
             return .pure(t)
         case .fetchInt(let string, let then):
-            return LazyIdentity {
-                // do some API call...
-                if string == "meaning of life" {
-                    return 42
-                }
-                else {
-                    return -1
-                }
-            }.then {int in
-                self.store.send(then(int))
-            }
+            return fetch.parse((string, then))
         case .mutate(let change, let then):
             return LazyIdentity {change(&self.store.value)}
                 .then {
-                    return self.store.send(then($0))
+                    return self.store.parse(then($0))
                 }
         case .assert42:
             return LazyIdentity{ XCTAssert(self.store.value == 42) }
@@ -99,7 +94,57 @@ final class TestInterpreter : Interpreter<Int, TestCommand<Void>, LazyIdentity<V
     }
     
     func onShutDown()  {
-        store.send(.onShutdown).runUnsafe()
+        store.send(.onShutdown)
+    }
+    
+    func runUnsafe(_ program: LazyIdentity<()>) {
+        program.runUnsafe()
+    }
+    
+}
+
+struct FetchInterpreter : CaseInterpreter, Dependency {
+    
+    typealias Symbols = TestCommand<Void>
+    typealias Program = LazyIdentity<Void>
+    
+    static let defaultValue = FetchInterpreter()
+    
+    @Injected var store : MutableStore<Int, TestCommand<Void>, LazyIdentity<Void>>
+    
+    let casePath : CasePath<TestCommand<Void>, (String,  @MainActor (Int) -> TestCommand<Void>)> = /TestCommand<Void>.fetchInt
+    
+    func parse(_ command: (String, @MainActor (Int) -> TestCommand<Void>)) -> LazyIdentity<Void> {
+        let (string, then) = command
+        return LazyIdentity {
+            // do some API call...
+            if string == "meaning of life" {
+                return 42
+            }
+            else {
+                return -1
+            }
+        }.then {int in
+            self.store.parse(then(int))
+        }
+    }
+    
+    func emptyProgram() -> LazyIdentity<Void> {
+        .pure(())
+    }
+    
+    func runUnsafe(_ program: LazyIdentity<Void>) {
+        program.runUnsafe()
+    }
+   
+}
+
+
+extension Dependencies {
+    
+    @MainActor
+    var fetchInterpreter : FetchInterpreter {
+        self[FetchInterpreter.self]
     }
     
 }
