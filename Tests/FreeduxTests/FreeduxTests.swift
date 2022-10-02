@@ -69,9 +69,9 @@ final class TestInterpreter : Interpreter {
         store.send(.onBoot)
     }
     
-    @Injected var store : MutableStore<Int, TestCommand<Void>, LazyIdentity<Void>>
+    @Injected(Dependencies.store) var store : MutableStore<Int, TestCommand<Void>, LazyIdentity<Void>>
     
-    @Injected(\.fetchInterpreter) var fetch
+    @Constant(\.fetchInterpreter) var fetch
     
     func parse(_ symbols: TestCommand<Void>) -> LazyIdentity<Void> {
         switch symbols {
@@ -110,7 +110,7 @@ struct FetchInterpreter : CaseInterpreter, Dependency {
     
     static let defaultValue = FetchInterpreter()
     
-    @Injected var store : MutableStore<Int, TestCommand<Void>, LazyIdentity<Void>>
+    @Injected(Dependencies.store) var store : MutableStore<Int, TestCommand<Void>, LazyIdentity<Void>>
     
     let casePath : CasePath<TestCommand<Void>, (String,  @MainActor (Int) -> TestCommand<Void>)> = /TestCommand<Void>.fetchInt
     

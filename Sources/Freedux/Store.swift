@@ -21,6 +21,7 @@ public class Store<State, Symbols> : ObservableObject, Reader {
     }
     fileprivate var interpreter : AnyInterpreter
     private var hasShutdown = false
+    private var env : Dependencies
     
     @MainActor
     fileprivate init<I : Interpreter>(_ env: Dependencies,
@@ -29,6 +30,7 @@ public class Store<State, Symbols> : ObservableObject, Reader {
         let (value, interpreter) = build(env)
         self.value = value
         self.interpreter = interpreter
+        self.env = env // retain references
     }
     
     @MainActor
@@ -88,10 +90,20 @@ public enum StoreKey<State, Symbol, Program> : Dependency {
 }
 
 
-public extension Injected {
+public extension Dependencies {
     
-    init<State, Symbol, Program>() where Value == MutableStore<State, Symbol, Program>, Whole == Dependencies {
-        self = Injected{env in env[StoreKey<State, Symbol, Program>.self]}
+    @MainActor
+    func store<State, Symbol, Program>() -> MutableStore<State, Symbol, Program> {
+        self[StoreKey.self]
+    }
+    
+}
+
+
+public extension Injected where Whole == Dependencies {
+    
+    init(_ closure: @escaping @MainActor (Dependencies) -> @MainActor () -> Value) {
+        self = Injected{env in closure(env)()}
     }
     
 }
