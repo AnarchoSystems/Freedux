@@ -5,32 +5,7 @@
 //  Created by Markus Kasperczyk on 01.10.22.
 //
 
-public protocol AnyInterpreter {
-    
-    @MainActor
-    func onBoot()
-    
-    @MainActor
-    func onShutDown()
-    
-    @MainActor
-    func _parse(_ any: Any) -> Any
-    
-    @MainActor
-    func _runUnsafe(_ any: Any)
-    
-}
-
-public extension AnyInterpreter {
-    
-    @MainActor
-    func _run(_ any: Any) {
-        _runUnsafe(_parse(any))
-    }
-    
-}
-
-public protocol Interpreter<Symbols, Program> : AnyInterpreter {
+public protocol Interpreter<Symbols, Program> {
     
     associatedtype Symbols
     associatedtype Program
@@ -43,25 +18,29 @@ public protocol Interpreter<Symbols, Program> : AnyInterpreter {
     
 }
 
+
 public extension Interpreter {
     
     @MainActor
-    func _parse(_ any: Any) -> Any {
-        parse(any as! Symbols)
+    func callAsFunction(_ symbols: Symbols) -> Program {
+        parse(symbols)
     }
     
-    @MainActor
-    func _runUnsafe(_ any: Any) {
-        runUnsafe(any as! Program)
-    }
-    
-    @MainActor
-    func runUnsafe(_ program: ()) where Program == Void {}
-    
-    @MainActor
-    func onBoot() {}
-    
-    @MainActor
-    func onShutDown() {}
-
 }
+
+
+#if canImport(Combine)
+
+import Combine
+
+public extension Interpreter where Self : ObservableObject, ObjectWillChangePublisher == ObservableObjectPublisher {
+    
+    @MainActor
+    func send(_ symbols: Symbols) {
+        objectWillChange.send()
+        runUnsafe(parse(symbols))
+    }
+    
+}
+
+#endif

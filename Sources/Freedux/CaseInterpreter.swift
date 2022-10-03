@@ -44,4 +44,9 @@ public extension CaseInterpreter {
     
     func emptyProgram<T>() -> T? where Program == T? {nil}
     
+    @MainActor
+    func callAsFunction(_ command: Command) -> Program {
+        parse(command)
+    }
+    
 }
