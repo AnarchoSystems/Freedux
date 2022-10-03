@@ -27,23 +27,12 @@ final class FreeduxTests: XCTestCase {
 
 enum TestCommand<T> {
     case onBoot
-    case pure(T)
     case fetchInt(String,
                   (Int) -> TestCommand<T>)
     case mutate( (inout Int) -> T,
                  (T) -> TestCommand<T>)
     case assert42
     case onShutdown
-}
-
-extension TestCommand where T == Void {
-    
-    static var nop : Self {.pure(())}
-    
-    static func mutate(_ change: @escaping (inout Int) -> Void) -> Self {
-        .mutate(change, {.nop})
-    }
-    
 }
 
 func doSomething() -> TestCommand<Void> {
@@ -73,6 +62,10 @@ struct LazyIdentity<T> {
 final class TestInterpreter : Interpreter, ObservableObject {
     
     private var didBoot = false
+    private var didFetch = false
+    private var didMutate = false
+    private var didAssert42 = false
+    private var didShutdown = false
     private var value : Int = 0
     
     @Constant(\.fetchInterpreter) var fetch
@@ -85,24 +78,27 @@ final class TestInterpreter : Interpreter, ObservableObject {
         switch symbols {
         case .onBoot:
             return LazyIdentity {self.didBoot = true}
-        case .pure(let t):
-            return .pure(t)
         case .fetchInt(let string, let then):
-            return fetch.parse((string, then))
+            return fetch.parse((string, then)).then {self.didFetch = true; return .pure(())}
         case .mutate(let change, let then):
-            return LazyIdentity {change(&self.value)}
+            return LazyIdentity {change(&self.value); self.didMutate = true}
                 .then {
                     return self.parse(then($0))
                 }
         case .assert42:
-            return LazyIdentity{ XCTAssert(self.value == 42) }
+            return LazyIdentity{ XCTAssert(self.value == 42); self.didAssert42 = true }
         case .onShutdown:
-            return LazyIdentity {XCTAssert(self.didBoot)}
+            return LazyIdentity {self.didShutdown = true}
         }
     }
     
     deinit {
         runUnsafe(parse(.onShutdown))
+        XCTAssert(didBoot)
+        XCTAssert(didFetch)
+        XCTAssert(didMutate)
+        XCTAssert(didAssert42)
+        XCTAssert(didShutdown)
     }
     
     nonisolated func runUnsafe(_ program: LazyIdentity<()>) {
@@ -120,6 +116,8 @@ struct FetchInterpreter : CaseInterpreter, Dependency {
     
     let casePath : CasePath<TestCommand<Void>, (String, (Int) -> TestCommand<Void>)> = /TestCommand<Void>.fetchInt
     
+    @Injected({$0.store()}) var store : TestInterpreter
+    
     nonisolated func parse(_ command: (String, (Int) -> TestCommand<Void>)) -> LazyIdentity<Void> {
         let (string, then) = command
         return LazyIdentity {
@@ -131,8 +129,7 @@ struct FetchInterpreter : CaseInterpreter, Dependency {
                 return -1
             }
         }.then {int in
-            guard case .fetchInt(let str, let then) = then(int) else {return .init{}}
-            return parse((str, then))
+            store.parse(then(int))
         }
     }
     
