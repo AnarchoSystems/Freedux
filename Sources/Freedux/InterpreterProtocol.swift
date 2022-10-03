@@ -26,6 +26,8 @@ public extension Interpreter {
         parse(symbols)
     }
     
+    func runUnsafe(_ program: ()) where Program == Void {}
+    
 }
 
 
